@@ -3,11 +3,47 @@ package urlutils
 import (
 	"errors"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/antchfx/htmlquery"
 	"golang.org/x/net/html"
+	"golang.org/x/net/idna"
 )
+
+var percentHexRegex = regexp.MustCompile(`%[0-9a-fA-F]{2}`)
+
+// normalizePercentEncoding converts percent-encoded hex characters to uppercase.
+func normalizePercentEncoding(s string) string {
+	return percentHexRegex.ReplaceAllStringFunc(s, func(m string) string {
+		return strings.ToUpper(m)
+	})
+}
+
+// NormalizeURLString parses, converts the host to Punycode, normalizes percent encoding,
+// and returns the canonical URL string.
+func NormalizeURLString(urlStr string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(urlStr))
+	if err != nil {
+		return "", err
+	}
+
+	if u.Host != "" {
+		asciiHost, err := idna.ToASCII(u.Host)
+		if err == nil {
+			u.Host = asciiHost
+		}
+	}
+
+	if u.RawPath != "" {
+		u.RawPath = normalizePercentEncoding(u.RawPath)
+	}
+	u.Path = normalizePercentEncoding(u.Path)
+	u.RawQuery = normalizePercentEncoding(u.RawQuery)
+	u.Fragment = normalizePercentEncoding(u.Fragment)
+
+	return u.String(), nil
+}
 
 // Return an absolute URL removing the URL fragment and taking into account
 // the document's base tag if it exists. Absolute URLs are created taking into account
@@ -44,7 +80,17 @@ func AbsoluteURL(urlStr string, n *html.Node, currentURL *url.URL) (*url.URL, er
 		return nil, errors.New("protocol not supported")
 	}
 
-	return u, nil
+	normalizedStr, err := NormalizeURLString(u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedURL, err := url.Parse(normalizedStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return normalizedURL, nil
 }
 
 // htmlBase returns the url in the base tag if it exists. Otherwise it returns an error.

@@ -45,7 +45,7 @@
 					<div class="content content-centered">
 						<div class="url">
 							{{ if .Title }}{{ .Title }}<br />{{ end }}
-							<a href="/resources?pid={{ $pid }}&ep=1&rid={{ .Id }}">{{ .URL }}</a>
+							<a href="/resources?pid={{ $pid }}&ep=1&rid={{ .Id }}">{{ decodeURL .URL }}</a>
 						</div>
 					</div>
 				</div>

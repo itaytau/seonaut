@@ -5,10 +5,13 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 )
 
 type (
@@ -40,6 +43,7 @@ func NewRenderer(config *RendererConfig, translator RendererTranslator) (*Render
 		"add":        r.add,
 		"to_kb":      r.toKByte,
 		"is_rtl":     r.isRTL,
+		"decodeURL":  decodeURL,
 		"trans":      func(s string, args ...interface{}) string { return s },   // This gets replaced with the user lang in the RenderTemplate
 		"trans_date": func(d time.Time, f string) string { return d.Format(f) }, // This gets replaced with the user lang in the RenderTemplate
 	}
@@ -149,4 +153,67 @@ func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.
 	})
 
 	return root, err
+}
+
+// decodeURL converts Punycode hostnames back to Unicode and unescapes paths/queries/fragments
+// so they can be presented beautifully to the user.
+func decodeURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr
+	}
+
+	unicodeHost, err := idna.ToUnicode(u.Host)
+	if err != nil {
+		unicodeHost = u.Host
+	}
+
+	decodedPath, err := url.PathUnescape(u.Path)
+	if err != nil {
+		decodedPath = u.Path
+	}
+
+	decodedQuery := u.RawQuery
+	if dq, err := url.QueryUnescape(u.RawQuery); err == nil {
+		decodedQuery = dq
+	}
+
+	decodedFragment := u.Fragment
+	if df, err := url.PathUnescape(u.Fragment); err == nil {
+		decodedFragment = df
+	}
+
+	var sb strings.Builder
+	if u.Scheme != "" {
+		sb.WriteString(u.Scheme)
+		sb.WriteString("://")
+	}
+
+	if u.User != nil {
+		sb.WriteString(u.User.String())
+		sb.WriteByte('@')
+	}
+
+	sb.WriteString(unicodeHost)
+
+	if decodedPath != "" {
+		if !strings.HasPrefix(decodedPath, "/") {
+			sb.WriteByte('/')
+		}
+		sb.WriteString(decodedPath)
+	} else if u.Scheme != "" || unicodeHost != "" {
+		sb.WriteByte('/')
+	}
+
+	if decodedQuery != "" {
+		sb.WriteByte('?')
+		sb.WriteString(decodedQuery)
+	}
+
+	if decodedFragment != "" {
+		sb.WriteByte('#')
+		sb.WriteString(decodedFragment)
+	}
+
+	return sb.String()
 }

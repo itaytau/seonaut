@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/stjudewashere/seonaut/internal/models"
+	"github.com/stjudewashere/seonaut/internal/urlutils"
 )
 
 type (
@@ -121,6 +122,12 @@ func (s *ProjectService) DeleteAllUserProjects(user *models.User) {
 // validateProject checks the project's URL and User-Agent to make sure they are valid.
 // It is called when a project is saved or updated.
 func (s *ProjectService) validateProject(p *models.Project) error {
+	normalized, err := urlutils.NormalizeURLString(p.URL)
+	if err != nil {
+		return err
+	}
+	p.URL = normalized
+
 	parsedURL, err := url.Parse(p.URL)
 	if err != nil {
 		return err

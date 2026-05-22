@@ -38,7 +38,7 @@
 					{{ if .PageReportView.PageReport.Title }}
 					{{ .PageReportView.PageReport.Title }} <br>
 					{{ end }}
-					{{ .PageReportView.PageReport.URL }}
+					{{ decodeURL .PageReportView.PageReport.URL }}
 					<a class="borderless" href="{{ .PageReportView.PageReport.URL }}" target="_blank">↗</a>
 				</div>
 			 </div>
